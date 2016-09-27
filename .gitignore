@@ -1,6 +1,5 @@
 .DS_store
 *.csv
 /texts/*
-/text_tank/*
 /ref_texts/*
 *.pyc
