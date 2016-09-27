@@ -6,7 +6,7 @@
 
 You'll need python3+ to run character_profiler. Follow these steps:
 
-#### - 1. Install brew (a package manager for OSX).
+#### 1. Install brew (a package manager for OSX).
 
   - Open Terminal.app (located in Applications/Utilities/Terminal.app)
   - Paste this line into the command prompt:
@@ -15,7 +15,7 @@ You'll need python3+ to run character_profiler. Follow these steps:
   - When it has successfully run, type this command into the command line:
   `brew -v`, and you should see confirm the version (currently 0.9.9) of brew you just installed.
   
-#### - 2. Install python3 with brew
+#### 2. Install python3 with brew
   - In your terminal window type:
   `brew install python3`
   - Wait for the packages to install. When it has successfully run, in the same propmt window, type:
@@ -99,6 +99,7 @@ This should confirm that your installation is correct.
 Exit the prompt with Ctrl+z.
 
 ### 3. Configure the collocation parameters. 
+
 
 
 
