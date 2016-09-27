@@ -4,9 +4,8 @@
 ## Version:  1.0
 ## Location: http://www.eskimo.com/~jet/python/examples/cmd/
 ## Copyright (c) 2004, James Thiele
-## Modified: Paul Bucci 2014
+## Modified: Paul Bucci, Carson Logan 2014
 ## Purpose: Console framework for ease of use and debugging
-## Website: PaulBucci.ca
 
 import os
 import cmd
@@ -333,3 +332,4 @@ class ParseHandler(cmd.Cmd):
 if __name__ == '__main__':
     console = ParseHandler('/Users/{Your Username}/Desktop/character_profiler/texts')
     console.cmdloop()
+
