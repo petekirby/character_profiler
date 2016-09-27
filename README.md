@@ -301,13 +301,13 @@ Please read the CSV header line to get the specifics.
 
 ### 3. Frequency
 
-If you want to get frequencies for characters do exactly the sames steps as in '2. Generate Collocation Data', except in step five, change <br>
+If you want to get frequencies for characters do exactly the sames steps as in '2. Generate Collocation Data', except in step four, change <br>
 
-5. `=>>save_summary` <br>
+4. `=>>jobs` <br>
 
-to <br>
+    to <br>
 
-5. `=>>hz` <br>
+4. `=>>hz` <br>
 
 You will be asked to add a character class and characters. In a text editor create a list with your class and characters that will look something like: <br>
 
