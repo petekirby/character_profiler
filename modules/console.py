@@ -331,5 +331,5 @@ class ParseHandler(cmd.Cmd):
             print(e.__class__, ':', e)
 
 if __name__ == '__main__':
-    console = ParseHandler('/Users/carsonklogan/Desktop/collocation_profiler/texts')
+    console = ParseHandler('/Users/{Your Username}/Desktop/character_profiler/texts')
     console.cmdloop()
