@@ -100,9 +100,64 @@ Exit the prompt with Ctrl+z.
 
 ### 3. Configure the collocation parameters. 
 
+There are two relevant files that need to be modified when you want to run different jobs. First, jobs.py.
 
+#### Jobs.py
 
+This file lists all the collocations a user can run when they are inside the console prompt.
 
+Jobs must have unique names.
 
+I would suggest running no more than 20 jobs (20 lines in jobs.py) at a time. Optimizations to come, but don't rely on this 
+becoming more efficient any time soon.
+
+Two select 20 jobs, remove the hash (#) before each job. Like this:
+
+```python
+
+#  'raw_freq' : ('all_chars', 'dummy_set', 'stopwords', 'delimiters', 50), DON'T UNCOMMENT THIS LINE
+    'job1' : ('high_god', 'punishment', 'stopwords', 'delimiters', 50),
+    'job2' : ('high_god', 'reward', 'stopwords', 'delimiters', 50),
+    'job3' : ('high_god', 'reduced_punishment', 'stopwords', 'delimiters', 50),
+    'job4' : ('high_god', 'reduced_reward', 'stopwords', 'delimiters', 50),
+    'job5' : ('high_god', 'ubc_emotion', 'stopwords', 'delimiters', 50)
+   # 'job6' : ('high_god', 'ubc_cognition', 'stopwords', 'delimiters', 50),
+   # 'job7' : ('high_god', 'ubc_religion', 'stopwords', 'delimiters', 50),
+   # 'job8' : ('high_god', 'ubc_morality', 'stopwords', 'delimiters', 50),
+   # 'job9' : ('high_god', 'ubc_morality_positive', 'stopwords', 'delimiters', 50),
+   # 'job10' : ('high_god', 'ubc_morality_negative', 'stopwords', 'delimiters', 50),
+
+```
+
+If you do this, only jobs1-jobs5 will be run. Everything else will be ignored. Add the # back once finished.
+Sometimes you will have a list of hundreds of jobs. The easiest way to keep track is to take note of completed jobs.
+
+In python all collections or lists of items are comma separated, make sure that each line has a comma at the end if you intend to perform that job. 
+
+Any line in the whole body of code that begins with a # will not be read or "ran" by the python compiler.
+
+#### Classes.py
+
+Classes.py and jobs.py work together. Classes.py contains the lists of character classes that the user wants to generate collcations for. You will notice that the names given to classes are the same used in jobs.py. If they don't match, they wont run.
+
+Example:
+
+```python
+
+From jobs.py
+ 'job1' : ('high_god', 'punishment', 'stopwords', 'delimiters', 50),
+ 
+From classes.py
+ 'high_god' : ('天','帝','上帝','后帝','天主','天地','神君','天子'),
+```
+
+Note that high_god is the same in both places.
+
+You can add or remove any classes from this file as you please. Note the syntax, however:
+
+The name has quotes: `'class_name'`
+Followed by a colon: `:`
+Followed by an open bracket: `(`
+Followed by a list of characters, each comma separated and single-quoted: `'A', 'B', 'C'`
 
 
