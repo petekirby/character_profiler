@@ -124,7 +124,7 @@ Followed by a closed bracket:                                             `)`<br
 
 **As with any changes you make to files in this package, if you are not familiar with python, look carefully at how the syntax is implemented and make your content changes accordingly.
 
-### 2. Generate Collocation Data
+### 4. Generate Collocation Data
 
 * Note, the profiler will currently generate data at the 50,10,5,2,1,sentence levels. This configuration can be changed.
 
@@ -179,8 +179,8 @@ Each line in this files output represents something like:
 
 Please read the CSV header line to get the specifics.
 
-### 3. Finishing Touches
+### 5. Finishing Touches
 
-After running all your jobs (if 100, then 5 * 20 runs) and saving your csv's uniquely, combine them into a single file. Now you have a master csv file that can be parsed or analysed with your favorite tool or statistics package (R, Excel, etc.).
+After running all your job, you have a master csv file that can be parsed or analysed with your favorite tool or statistics package (R, Excel, etc.).
 
 #### Please create an issue for any changes, suggestions, or comments.
