@@ -36,16 +36,18 @@ class NodeHandler(object):
                     else:
                         self.queue.append(node)
 
-# All pertainent characters in a text are represented
+
+# All pertinent characters in a text are represented
 # as nodes.
 class Node(object):
-    def __init__(self,char,cc,pos,key):
+    def __init__(self,char,cc,pos,key,sent=0):
+        self.sentence = sent
         self.pos = pos
         self.rightpos = pos
         self.cc = cc
         self.char = char
         self.key = key
-        self.edges = []
+        self.edge_count = {}
         self.id = self.key + "_" + str(self.pos)
 
     def next_char(self):
@@ -60,317 +62,179 @@ class Node(object):
     def getRight(self):
         rpos = self.pos + len(self.char) - 1
         return rpos
-    
-    # returns an edge count
-    def countEdges(self):
-        count = len(self.edges)
-        return count
-    
-    def add(self,edge):
-        self.edges.append(edge)
-    
+
     # Prints all of the good info about a node
     def printNode(self):
         log("\t#### Node ####")
         log("\tClass: " + self.cc.id)
         log("\tKey: " + self.key)
-        for e in self.edges:
-            e.printEdge()
 
-# The relationship between two nodes, directed from
-# origin node as a focal node to dest as a compare
-class Edge(object):
-    def __init__(self,dest,cost):
-        self.id = dest.id + "_" + str(cost)
-        self.cost = cost
-        self.cc = dest.cc.id
-        self.pos = dest.pos
-        self.char = dest.char
-    
-    # Prints all of the good info about an edge
-    def printEdge(self):
-        log("\t\t#### Edge ####")
-        log("\t\tClass: " + self.cc)
-        log("\t\tId: " + self.id)
-        log("\t\tCost: " + str(self.cost))
-        log("\t\tAbsolute cost: " + str(abs(self.cost)) + "\n")
 
 class NodeProfile(object):
-    def __init__(self,focals,stopwords,delims,compares,focal,
-                 compare,stopword,delim,maxcost):
+    def __init__(self,focals,compares,delims,focal,compare,stopword,delim,maxcost):
         self.focals = focals
-        self.stopwords = stopwords
-        self.delims = delims
         self.compares = compares
+        self.delims = delims
         self.focal = focal
         self.compare = compare
         self.stopword = stopword
         self.delim = delim
         self.maxcost = maxcost
+        self.costs = [maxcost, 10, 5, 2, 1]
+        self.edge_count = {}
+        self.contingency = {}
         self.id = (focal.id + "_" + compare.id + "_" +
                    stopword.id + "_" + delim.id + "_" + str(maxcost))
-        self.generateEdges()
-    
-    # There are a lot of edges, so a quick search is dependent on
-    # having a reasonable upper bound (maxcost) on the length of a sentence.
-    # This upper bound allows each search to have <= 2*maxcount checks since
-    # we are guaranteed that each found item is within +- maxcost.
-    def generateEdges(self):
-        log("Generating edges for " + self.id)
-        max = self.maxcost
-        neg_max = (-1 * max)
-        edge_count = 0
-        # The list position of the first found element so we don't need to
-        # keep checking the beginning of the list when abs(cost) > maxcost
-        first_stop = 0
-        first_delim = 0
-        first_compare = 0
-        # Optimizations tricks
-        stopword = self.stopword.id
-        delim = self.delim.id
+        gc.disable()
+        self.generate_edges()
+        self.generate_contingency_table()
+        gc.enable()
+        self.compare_count = len(compares)
+        self.focal_count = len(focals)
+        self.node_count = self.delims[-1].pos + 1
+        self.sentence_count = len(self.delims)
+        self.focals = []
+        self.compares = []
+        self.delims = []
+
+    def search_after_position(self,nodes,needle,lo=0,hi=None):
+        if hi is None:
+            hi = len(nodes)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if (nodes[mid].pos < needle):
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo
+
+    def search_after_sentence(self,nodes,needle,lo=0,hi=None):
+        if hi is None:
+            hi = len(nodes)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if (nodes[mid].sentence < needle):
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo
+
+    def generate_edges(self):
         for f in self.focals:
-            gc.disable()
-            f_pos = f.pos
-            # For each newly-minted focal node, determine the distance to
-            # each stopword if the node is within maxcost absolute distance.
-            # This is because we don't want to count these words towards the
-            # distance of future nodes.
-            found_first_stop = False
-            stop_index = first_stop
-            for s in self.stopwords[first_stop:]:
-                s_cost = f_pos - s.pos
-                # Stop at upper searching bound
-                if s_cost < neg_max:
+            # find all comparisons within certain distance, add to edge count for distance
+            start_pos_value = f.pos - self.maxcost
+            # print('working on start_pos_value ' + str(start_pos_value))
+            i = self.search_after_position(self.compares,start_pos_value)
+            while i < len(self.compares):
+                dist = abs(f.pos - self.compares[i].pos)
+                i += 1
+                # print('comparing at dist ' + str(dist))
+                if dist > self.maxcost:
                     break
-                # Double-checking constraints, might not be necessary
-                if abs(s_cost) <= max and s_cost != 0:
-                    # Set first matched stop character to
-                    # lower bound for searching
-                    if found_first_stop == False:
-                        found_first_stop = True
-                        first_stop = (stop_index)
-                    f.add(Edge(s,s_cost))
-                    edge_count += 1
-                stop_index += 1
-        
-            # Do the same for the delimiters.
-            found_first_delim = False
-            delim_index = first_delim
-            for d in self.delims[first_delim:]:
-                d_pos = d.pos
-                d_cost = f_pos - d_pos
-                d_takeaway = 0
-                if d_cost < neg_max:
-                    break
-                for e in f.edges:
-                    e_pos = e.pos
-                    # If this edge is between the delimiter and the focal
-                    # character, and it's a stopword, we'll need to account
-                    # for the position difference since stopwords are (sometimes)
-                    # to be considered the same as whitespace.
-                    if (((e_pos > d_pos and e_pos < f_pos) or
-                            (e_pos < d_pos and e_pos > f_pos)) and
-                                (e.cc == stopword)):
-                        d_takeaway += 1
-                # Decrease the absolute cost
-                if d_cost < 0:
-                    d_cost += d_takeaway
-                elif d_cost > 0:
-                    d_cost -= d_takeaway
-                if abs(d_cost) <= max and d_cost != 0:
-                    if found_first_delim == False:
-                        found_first_delim = True
-                        first_delim = (delim_index)
-                    f.add(Edge(d,d_cost))
-                    edge_count += 1
-                delim_index += 1
-            
-            # Now we can calculate the compares by the distance ignoring
-            # stopwords and delimiters, giving a better true distance
-            found_first_compare = False
-            compare_index = first_compare
-            for c in self.compares[first_compare:]:
-                c_pos = c.pos
-                c_cost = f_pos - c_pos
-                if c_cost < neg_max:
-                    break
-                c_takeaway = 0
-                for e in f.edges:
-                    e_pos = e.pos
-                    # Similarly to above, both stopwords and delimiters
-                    # are considered to not count towards edge costs for
-                    # comparison characters.
-                    if (((e_pos > c_pos and e_pos < f_pos) or
-                         (e_pos < c_pos and e_pos > f_pos)) and
-                            (e.cc == stopword or
-                             e.cc == delim)):
-                        c_takeaway += 1
-                if c_cost < 0:
-                    c_cost += c_takeaway
-                elif c_cost > 0:
-                    c_cost -= c_takeaway
-                if abs(c_cost) <= max and c_cost != 0:
-                    if found_first_compare == False:
-                        found_first_compare = True
-                        first_compare = (compare_index)
-                    f.add(Edge(c,c_cost))
-                    edge_count += 1
-                compare_index += 1
-            gc.enable()
-        log("Edge count was " + str(edge_count))
+                if dist == 0:
+                    continue
+                f.edge_count[str(self.maxcost)] = f.edge_count.get(str(self.maxcost), 0) + 1
+                for cost in self.costs[1:]:
+                    if dist <= cost:
+                        f.edge_count[str(cost)] = f.edge_count.get(str(cost), 0) + 1
+            # find all comparisons in same sentence, add to edge count for sentence
+            i = self.search_after_sentence(self.compares,f.sentence)
+            while i < len(self.compares) and self.compares[i].sentence == f.sentence:
+                if f.pos != self.compares[i].pos:
+                    f.edge_count["sentence"] = f.edge_count.get("sentence", 0) + 1
+                i += 1
+            # update edge count totals
+            for cost in self.costs:
+                self.edge_count[str(cost)] = self.edge_count.get(str(cost), 0) + f.edge_count.get(str(cost), 0)
+            self.edge_count['sentence'] = self.edge_count.get('sentence', 0) + f.edge_count.get('sentence', 0)
+
+    def generate_contingency_table(self):
+        # we want to calculate the total number of words that are within distance of the compares
+        # we can subtract the numbers for the focals to get the nubmers for the rest
+        total_pos = {}
+        total_neg = {}
+        focal_pos = {}
+        focal_neg = {}
+        last_position = self.delims[-1].pos
+        pos = self.compares[0].pos if len(self.compares) > 0 else -1
+        for c in self.compares[1:]:
+            dist = c.pos - pos - 1
+            for cost in self.costs:
+                if dist <= 2 * cost:
+                    total_pos[str(cost)] = total_pos.get(str(cost), 0) + dist
+                else:
+                    total_pos[str(cost)] = total_pos.get(str(cost), 0) + 2 * cost
+                    total_neg[str(cost)] = total_neg.get(str(cost), 0) + dist - 2 * cost
+            pos = c.pos
+        # adjust for the beginnings and ends
+        for cost in self.costs:
+            if len(self.compares) >= 1:
+                start_end_distances = [self.compares[0].pos, last_position - self.compares[-1].pos]
+                for dist in start_end_distances:
+                    if dist <= cost:
+                        total_pos[str(cost)] = total_pos.get(str(cost), 0) + dist
+                    else:
+                        total_pos[str(cost)] = total_pos.get(str(cost), 0) + cost
+                        total_neg[str(cost)] = total_neg.get(str(cost), 0) + dist - cost
+            else:
+                total_neg[str(cost)] = last_position + 1
+        # get sentence totals
+        pos = -1
+        i = 0
+        for d in self.delims:
+            if i < len(self.compares) and self.compares[i].sentence == d.sentence:
+                total_pos['sentence'] = total_pos.get('sentence', 0) + d.pos - pos
+            else:
+                total_neg['sentence'] = total_neg.get('sentence', 0) + d.pos - pos
+            while i < len(self.compares) and self.compares[i].sentence == d.sentence:
+                total_pos['sentence'] -= 1
+                i += 1
+            pos = d.pos
+        # get the numbers for the focal words
+        for f in self.focals:
+            for cost in self.costs:
+                focal_pos[str(cost)] = focal_pos.get(str(cost), 0) + (1 if f.edge_count.get(str(cost), 0) > 0 else 0)
+                focal_neg[str(cost)] = focal_neg.get(str(cost), 0) + (1 if f.edge_count.get(str(cost), 0) == 0 else 0)
+            focal_pos["sentence"] = focal_pos.get("sentence", 0) + (1 if f.edge_count.get("sentence", 0) > 0 else 0)
+            focal_neg["sentence"] = focal_neg.get("sentence", 0) + (1 if f.edge_count.get("sentence", 0) == 0 else 0)
+        # store the contingency table
+        for cost in self.costs:
+            self.contingency["{:02}".format(cost) + '_other_pos'] = total_pos.get(str(cost), 0) - focal_pos.get(str(cost), 0)
+            self.contingency["{:02}".format(cost) + '_other_neg'] = total_neg.get(str(cost), 0) - focal_neg.get(str(cost), 0)
+            self.contingency["{:02}".format(cost) + '_focal_pos'] = focal_pos.get(str(cost), 0)
+            self.contingency["{:02}".format(cost) + '_focal_neg'] = focal_neg.get(str(cost), 0)
+        self.contingency['sentence_other_pos'] = total_pos.get('sentence', 0) - focal_pos.get('sentence', 0)
+        self.contingency['sentence_other_neg'] = total_neg.get('sentence', 0) - focal_neg.get('sentence', 0)
+        self.contingency['sentence_focal_pos'] = focal_pos.get('sentence', 0)
+        self.contingency['sentence_focal_neg'] = focal_neg.get('sentence', 0)
 
     def printProfile(self):
         log("\n#### Profile ####")
         log("Focals: " + self.focal.id)
         log("Compares: " + self.compare.id)
-        for f in self.focals:
-            log("\n")
-            f.printNode()
+        for k,v in self.edge_count.items():
+            print('Edge count (' + str(k) + '): ' + str(v))
+        for k,v in self.contingency.items():
+            print('Contingency table (' + str(k) + '): ' + str(v))
 
-    def getColocations(self,abscost):
-        colocations = []
-        for f in self.focals[:]:
-            for e in f.edges:
-                if e.cc == self.compare.id and abs(e.cost) <= abscost:
-                    colocations.append(f)
-        return colocations
+    def countColocations(self, abscost):
+        return self.edge_count.get(str(abscost), 0)
 
-    def countColocations(self,abscost):
-        count = len(self.getColocations(abscost))
-        return count
-    
-    def countFocalEdges(self):
-        count = 0
-        for f in self.focals:
-            count = count + f.countEdges()
-        return count
-
-    def countCompareNodes(self):
-        l = len(compares)
-        return l
-    
-    # Returns a tuple of the two closest delimiter positions.
-    def getClosestTwoDelimiterPositions(self,f_pos,edges):
-        left = -1
-        right = sys.maxsize
-        for e in edges:
-            if e.pos < f_pos and e.pos > left and e.cc == self.delim.id:
-                left = e.pos
-            if e.pos > f_pos and e.pos < right and e.cc == self.delim.id:
-                right = e.pos
-        return left,right
-
-    # Count all matches within the two closest two delimiters.
     def countAllInSentence(self):
-        log("Started counting in sentence for " + self.id)
-        count = 0
-        for f in self.focals:
-            count += self.countInSentence(f)
-        return count
-    
-    def countInSentence(self,f):
-        count = 0
-        edges = f.edges
-        f_pos = f.pos
-        closest = self.getClosestTwoDelimiterPositions(f_pos,edges)
-        left = closest[0]
-        right = closest[1]
-        for e in edges:
-            pos = e.pos
-            if (e.cc == self.compare.id and
-                ((pos > left and pos < f_pos) or
-                 (pos < right and pos > f_pos))):
-                    count = count + 1
-        return count
-    
-    def countInSentenceByEdge(self,f,edge):
-        count = 0
-        edges = f.edges
-        f_pos = f.pos
-        closest = self.getClosestTwoDelimiterPositions(f_pos,edges)
-        left = closest[0]
-        right = closest[1]
-        for e in edges:
-            pos = e.pos
-            if (e.char == edge.char and
-                ((pos > left and pos < f_pos) or
-                 (pos < right and pos > f_pos))):
-                    count = count + 1
-        return count
+        return self.edge_count.get('sentence', 0)
 
-    # Return a dictionary containing every focal character
-    # by every compare character by a list costs per compare
-    #
-    # Example:
-    #
-    # dict = {
-    #           "f_0" : {
-    #                   "c_0" : {
-    #                               "50"       : 50,
-    #                               "10"        : 19,
-    #                               "5"         : 5,
-    #                               "1"         : 1,
-    #                               "sentence"  : 14,
-    #                           }
-    #                   "c_1" : ...
-    #                   ...
-    #                  },
-    #           ...
-    #        }
-    #
-    def focal_by_compare_by_edges(self):
-        # Initialize counts to zero
-        f_chardict = collections.OrderedDict()
-        for focal in self.focal.chars:
-            f_dict = collections.OrderedDict()
-            for char in self.compare.chars:
-                char_dict = collections.OrderedDict()
-                char_dict[str(self.maxcost)] = 0
-                char_dict["10"] = 0
-                char_dict["5"] = 0
-                char_dict["1"] = 0
-                char_dict["sentence"] = 0
-                f_dict[char] = char_dict
-            f_chardict[focal] = f_dict
-    
-        for focal in self.focals:
-            cc = 0
-            for edge in focal.edges:
-                cc += 1
-                if edge.cc == self.compare.id:
-                    if abs(edge.cost) <= self.maxcost:
-                        f_chardict[focal.char][edge.char][str(self.maxcost)] += 1
-                    if abs(edge.cost) <= 10:
-                        f_chardict[focal.char][edge.char]["10"] += 1
-                    if abs(edge.cost) <= 5:
-                        f_chardict[focal.char][edge.char]["5"] += 1
-                    if abs(edge.cost) <= 1:
-                        f_chardict[focal.char][edge.char]["1"] += 1
-                    sen = self.countInSentenceByEdge(focal,edge)
-                    f_chardict[focal.char][edge.char]["sentence"] += sen
-        return f_chardict
+    def countNodes(self):
+        return self.node_count
 
-    # Return dictionary of focal character hz in text
-    def focalCountDict(self):
-        f_chardict = {}
-        for focal in self.focal.chars:
-            count = 0
-            for f in self.focals:
-                if f.char == focal:
-                    count += 1
-            f_chardict[focal] = count
-        return f_chardict
+    def countSentences(self):
+        return self.sentence_count
 
-    # Return dictionary of compare character hz in text
-    def compareCountDict(self):
-        c_chardict = {}
-        for compare in self.compare.chars:
-            count = 0
-            for c in self.compares:
-                if c.char == compare:
-                    count += 1
-            c_chardict[compare] = count
-        return c_chardict
+    def getAverageSentence(self):
+        return countNodes() / countSentences()
+
+    def countFocalEdges(self):
+        return self.edge_count.get(str(self.maxcost), 0)
+
 
 # A set of characters with a unique identifier
 class CharacterClass(object):

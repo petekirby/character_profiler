@@ -12,17 +12,15 @@ class TextHandler(object):
         self.id = path.split("/").pop().split(".")[0]
         splittext = path.split("/").pop().split("_")
         # Fields that parse for organization
-        self.genre = int(splittext[0][1])
-        self.school = splittext[1]
+        self.era = splittext[0]
+        self.genre = splittext[1]
         self.genreNum = int(splittext[2])
         self.name = splittext[3]
-        self.seg = splittext[4]
-        self.punc = splittext[5].split(".")[0]
         self.file = None
         self.charnum = 0
         # Nodes
         self.nodes = []
-        # EdgeProfiles
+        # Profiles
         self.profiles = []
     
     # Makes each non-ignore character-phrase into a node
@@ -71,19 +69,25 @@ class TextHandler(object):
 
     def generateProfile(self,focal,compare,stopword,delim,maxcost=120):
         focals = []
-        stopwords = []
-        delims = []
         compares = []
+        delims = []
+        sentence = 0
+        stops = 0
+        sentence_length = 0
         # Sort the nodes into their correct categories
         for n in self.nodes[:]:
             if n.cc == focal:
-                focals.append(n)
+                focals.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
             elif n.cc == stopword:
-                stopwords.append(n)
+                stops += 1
             elif n.cc == delim:
-                delims.append(n)
+                stops += 1
+                delims.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
+                sentence += 1
             elif n.cc == compare:
-                compares.append(n)
-        p = NodeProfile(focals,stopwords,delims,compares,
-                        focal,compare,stopword,delim,maxcost)
+                compares.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
+        n = self.nodes[-1]
+        if (delims[-1].pos < n.pos - stops):
+            delims.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
+        p = NodeProfile(focals,compares,delims,focal,compare,stopword,delim,maxcost)
         self.profiles.append(p)     

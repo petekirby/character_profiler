@@ -5,6 +5,7 @@
 ## Location: http://www.eskimo.com/~jet/python/examples/cmd/
 ## Copyright (c) 2004, James Thiele
 ## Modified: Paul Bucci, Carson Logan 2014
+## Modified: Peter Kirby 2016
 ## Purpose: Console framework for ease of use and debugging
 
 import os
@@ -21,12 +22,13 @@ class ParseHandler(cmd.Cmd):
     def __init__(self,dirpath):
         cmd.Cmd.__init__(self)
         self.prompt = '=>> '
-        self.intro  = 'Welcome to console!'  ## defaults to None
+        self.intro  = 'Welcome to console!'  # defaults to None
         self.texts = []
         self.classes = []
         self.jobs = []
         self.loadAllClasses()
         self.ignore = self.getClass('ignore')
+        self.costs = [50, 10, 5, 2, 1]
         self.maxcost = 50
         self.dirpath = dirpath
     
@@ -78,11 +80,12 @@ class ParseHandler(cmd.Cmd):
                               self.getClass(stopwords),
                               self.getClass(delimiters),
                               maxcost)
+
     # Loads dictionary from jobs.py
     def loadAllJobs(self):
         for n,j in jobs.items():
             self.jobs.append(j)
-    
+
     ###### Command definitions ######
 
     '''Prints the names of all loaded texts.'''
@@ -109,8 +112,7 @@ class ParseHandler(cmd.Cmd):
         for t in self.texts:
             print(t.id)
             for p in t.profiles:
-                count = len(p.focals)
-                print(p.id + " focal node count is " + str(count))
+                print(p.id + " focal node count is " + str(p.countFocals))
 
     def do_count_all_focal_edges(self,line):
         '''For each focal node in each text, prints count of f.edges.'''
@@ -154,30 +156,41 @@ class ParseHandler(cmd.Cmd):
             print(t.id + " with " + str(len(t.profiles)) + " num of profiles")
             for p in t.profiles:
                 print(p.id)
-                print(str(self.maxcost) + ",10,5,2,1,sentence")
-                one_twenty = p.countColocations(self.maxcost)
-                ten = p.countColocations(10)
-                five = p.countColocations(5)
-                two = p.countColocations(2)
-                one = p.countColocations(1)
-                sentence = p.countAllInSentence()
-                print(str(one_twenty) + ',' + str(ten) + ',' + str(five) + ',' + str(two) + ',' + str(one) + ',' + str(sentence))
+                categories = ['era', 'genre', 'node count', 'sentence count']
+                categories.extend(['compare count', 'focal count', 'compare class', 'focal class'])
+                categories.extend(['sentence'] + [str(x) for x in self.costs])
+                for type in ['sentence'] + [str(x) for x in self.costs]:
+                    categories.extend([type + ' ' + x for x in ['other pos', 'other neg', 'focal pos', 'focal neg']])
+                print(','.join(x for x in categories))
+                data = [t.era, t.genre, str(p.countNodes()), str(p.countSentences())]
+                data.extend([str(p.compare_count), str(p.focal_count), p.compare.id, p.focal.id])
+                data.append(str(p.countAllInSentence()))
+                for cost in self.costs:
+                    data.append(str(p.countColocations(cost)))
+                data.extend([])
+                data.extend([str(v) for k,v in sorted(p.contingency.items(), reverse=True)])
+                print(','.join(x for x in data))
 
     # Print summary report
     def do_save_summary(self,line):
         '''Prints a summary to CSV.'''
         file = open(self.dirpath + 'summary.csv', 'w')
-        file.write('id,' + str(self.maxcost) + ',10,5,2,1,sentence\n')
+        categories = ['id', 'era', 'genre', 'node count', 'sentence count']
+        categories.extend(['compare count', 'focal count', 'compare class', 'focal class'])
+        categories.extend(['sentence'] + [str(x) for x in self.costs])
+        for type in ['sentence'] + [str(x) for x in self.costs]:
+            categories.extend([type + ' ' + x for x in ['other pos', 'other neg', 'focal pos', 'focal neg']])
+        file.write(','.join(x for x in categories) + '\n')
         for t in self.texts:
             for p in t.profiles:
-                file.write(t.id + '_' + p.id + '_,')
-                one_twenty = p.countColocations(self.maxcost)
-                ten = p.countColocations(10)
-                five = p.countColocations(5)
-                two = p.countColocations(2)
-                one = p.countColocations(1)
-                sentence = p.countAllInSentence()
-                file.write(str(one_twenty) + ',' + str(ten) + ',' + str(five) + ',' + str(two) + ',' + str(one) + ',' + str(sentence) + '\n')
+                data = [t.id + '_' + p.id]
+                data.extend([t.era, t.genre, str(p.countNodes()), str(p.countSentences())])
+                data.extend([str(p.compare_count), str(p.focal_count), p.compare.id, p.focal.id])
+                data.append(str(p.countAllInSentence()))
+                for cost in self.costs:
+                    data.append(str(p.countColocations(cost)))
+                data.extend([str(v) for k,v in sorted(p.contingency.items(), reverse=True)])
+                file.write(','.join(x for x in data) + '\n')
         file.close()
                 
     # Prints profile to console
@@ -188,26 +201,6 @@ class ParseHandler(cmd.Cmd):
             for p in t.profiles:
                 p.printProfile()
 
-    # Print a per-character count to CSV
-    def do_spcc(self,line):
-        '''Prints a summary to CSV.'''
-        for t in self.texts:
-            for p in t.profiles:
-                file = open(self.dirpath + "_" + p.id + "_per_char_count.csv", 'w')
-                dict = p.focal_by_compare_by_edges()
-                file.write(p.compare.id + ",")
-                for c in p.compare.chars:
-                    file.write(c + "," + str(self.maxcost) + ",10,5,1,sentence,")
-                file.write("\n")
-                for f,chars in dict.items():
-                    file.write(f + ",")
-                    for char,count in chars.items():
-                        file.write(",")
-                        for k,v in count.items():
-                            file.write(str(v) + ",")
-                    file.write("\n")
-                file.close()
-
     def do_load(self,line):
         ''' Loads all texts in a directory.'''
         log('Loading texts and jobs. Might take a minute.')
@@ -216,36 +209,6 @@ class ParseHandler(cmd.Cmd):
         self.loadAllJobs()
         self.loadAllTexts()
     
-    def do_hz(self,line):
-        '''Browse node profiles to get focal character frequencies'''
-        i = input("Please type the list of characters and focal class for which you wish to search.\nFor example, to search for the X character within the Capitals focal class, type:\n\t=>> Capitals,X\n" + self.prompt)
-        s = i.split(',')
-        cl = self.getClass(s[0])
-        chars = s[1:]
-        print('Class is ' + cl.id + ' and Characters are : ' + str(chars))
-        self.saveFrequency(cl,chars)
-
-    # Chars is list of characters
-    def saveFrequency(self,clazz,char_set):
-        file = open(self.dirpath + "_" + clazz.id + "_char_frequency.csv", 'w')
-        file.write('text_name,')
-        for c in char_set:
-            file.write(c + ',')
-        file.write('\n')
-        for text in self.texts:
-            file.write(text.id + ',')
-            for node_profile in text.profiles:
-                if (node_profile.focal == clazz):
-                    new_dict = collections.OrderedDict()
-                    dict = node_profile.focalCountDict()
-                    for c in char_set:
-                        new_dict[c] = dict[c]
-                    for key,value in new_dict.items():
-                        file.write(str(value) + ',')
-                    file.write('\n')
-                    break
-        file.close()
-
     def do_set_dirpath(self,line):
         '''Sets the path to the text directory.'''
         self.dirpath = line
@@ -258,8 +221,9 @@ class ParseHandler(cmd.Cmd):
     def do_set_max(self,line):
         '''Sets the max cost for edges. Makes parsing faster the smaller it is.'''
         self.maxcost = line
+        self.costs[0] = self.maxcost
         print('Max cost set to ' + line)
-    
+
     def do_hist(self, args):
         '''print(a list of commands that have been entered'''
         print(self._hist)
@@ -330,6 +294,6 @@ class ParseHandler(cmd.Cmd):
             print(e.__class__, ':', e)
 
 if __name__ == '__main__':
-    console = ParseHandler('/Users/{Your Username}/Desktop/character_profiler/texts')
+    console = ParseHandler('/mnt/c/Users/Peter/Desktop/character_profiler/texts')
     console.cmdloop()
 
