@@ -67,13 +67,27 @@ class TextHandler(object):
         log("\tThere were " + str(self.charnum) +
               " characters, and " + str(len(self.nodes)) + " nodes.")
 
+    def is_not_focal(self, pos, focal, lo=0, hi=None):
+        if hi is None:
+            hi = len(self.nodes)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if (self.nodes[mid].pos < pos):
+                lo = mid + 1
+            else:
+                hi = mid
+        while lo < len(self.nodes) and self.nodes[lo].pos == pos:
+            if self.nodes[lo].cc == focal:
+                return False
+            lo += 1
+        return True
+
     def generateProfile(self,focal,compare,stopword,delim,maxcost=120):
         focals = []
         compares = []
         delims = []
         sentence = 0
         stops = 0
-        sentence_length = 0
         # Sort the nodes into their correct categories
         for n in self.nodes[:]:
             if n.cc == focal:
@@ -85,7 +99,8 @@ class TextHandler(object):
                 delims.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
                 sentence += 1
             elif n.cc == compare:
-                compares.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
+                if self.is_not_focal(n.pos, focal):
+                    compares.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
         n = self.nodes[-1]
         if (delims[-1].pos < n.pos - stops):
             delims.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
