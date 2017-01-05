@@ -43,7 +43,6 @@ class Node(object):
     def __init__(self,char,cc,pos,key,sent=0):
         self.sentence = sent
         self.pos = pos
-        self.rightpos = pos
         self.cc = cc
         self.char = char
         self.key = key

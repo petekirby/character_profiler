@@ -88,19 +88,30 @@ class TextHandler(object):
         delims = []
         sentence = 0
         stops = 0
+        blocked_positions = []
+        # Determine the blocked positions (not focal/compare) from the 'stopwords'
+        for n in self.nodes[:]:
+            if n.cc == stopword:
+                for position in range(n.pos, n.getRight() + 1):
+                    blocked_positions.append(position)
+        blocked_position_set = frozenset(blocked_positions)
         # Sort the nodes into their correct categories
         for n in self.nodes[:]:
             if n.cc == focal:
-                focals.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
-            elif n.cc == stopword:
-                stops += 1
+                if n.pos not in blocked_position_set and n.getRight() not in blocked_position_set:
+                    focals.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
+            # elif n.cc == stopword:
+            #   decided not to consider 'stopwords' for this purpose
+            #   'stopwords' act as a mechanism for blocking words from being focal/compare words
+            #   stops += 1
             elif n.cc == delim:
                 stops += 1
                 delims.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
                 sentence += 1
             elif n.cc == compare:
-                if self.is_not_focal(n.pos, focal):
-                    compares.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
+                if n.pos not in blocked_position_set and n.getRight() not in blocked_position_set:
+                    if self.is_not_focal(n.pos, focal):
+                        compares.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
         n = self.nodes[-1]
         if (delims[-1].pos < n.pos - stops):
             delims.append(Node(n.char,n.cc,n.pos - stops,n.key,sentence))
